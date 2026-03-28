@@ -1,0 +1,47 @@
+image: node:18
+
+stages:
+  - test
+  - build
+  - deploy
+
+sast:
+  stage: test
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+build:
+  stage: build
+  script:
+    - yarn install
+    - yarn generate
+  artifacts:
+    paths:
+      - .output
+    expire_in: 1 hour
+
+deploy_staging:
+  stage: deploy
+  image: python:latest
+  script:
+    - apt-get update
+    - apt-get -y install python3-pip
+    - pip3 install awscli
+    - aws s3 sync .output/public/ s3://$S3_BUCKET_STAGING --delete
+  environment:
+    name: staging
+  only:
+    - develop
+
+deploy_production:
+  stage: deploy
+  image: python:latest
+  script:
+    - apt-get update
+    - apt-get -y install python3-pip
+    - pip3 install awscli
+    - aws s3 sync dist/ s3://$S3_BUCKET --delete --region $AWS_REGION
+  environment:
+    name: production
+  only:
+    - production
